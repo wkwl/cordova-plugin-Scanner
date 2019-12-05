@@ -168,7 +168,7 @@
     introLab.textAlignment = NSTextAlignmentCenter;
     introLab.textColor = [UIColor whiteColor];
     introLab.adjustsFontSizeToFitWidth = YES;
-    introLab.text = @"将二维码/条码放入框内，即可自动扫描";
+    introLab.text = @"将二维码放入框内，即可自动扫描";
     [self.view addSubview:introLab];
 
     UIButton * theLightBtn = [UIButton buttonWithType:UIButtonTypeCustom];
