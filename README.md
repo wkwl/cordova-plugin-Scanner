@@ -2,8 +2,7 @@ cordova-plugin-Scanner是供vue开发以及h5混合开发app，使用ios原生�
 安装说明：cordova plugin add https://github.com/wkwl/cordova-plugin-Scanner.git
 
 使用方式如下：
-<pre>
-<code>
+(''')
 <html>
 <head>
 <meta name="viewport" content="initial-scale=1, width=device-width, viewport-fit=cover">
@@ -31,4 +30,4 @@ alert(msg);
 </body>
 </html>
 </code>
-</pre>
+(''')
