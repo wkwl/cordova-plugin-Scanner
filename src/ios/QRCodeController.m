@@ -8,7 +8,7 @@
 
 #import "QRCodeController.h"
 #import <AVFoundation/AVFoundation.h>
-
+#import <UIKit/UIImagePickerController.h>
 @interface QRCodeController ()<AVCaptureMetadataOutputObjectsDelegate>{
     BOOL isFirst;
     BOOL upOrdown;
@@ -29,21 +29,41 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    isFirst=YES;
     upOrdown = NO;
     num =0;
-    self.view.backgroundColor = [UIColor whiteColor];
-    [self initDevice];
+    self.view.backgroundColor = [UIColor blackColor];
+        //获取摄像头
+    AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+    self.captureDevice = device;
+
+
+
     [self checkAVAuthorizationStatus];
     [self createBtn];
-    [self creatTimer];
+
+
 }
 - (void)viewWillAppear:(BOOL)animated {
-    _lineIV = [[UIImageView alloc] initWithFrame:CGRectMake(([UIScreen mainScreen].bounds.size.width - self.view.layer.bounds.size.width * 0.7)/2,self.view.layer.bounds.size.height * 0.25 , self.view.layer.bounds.size.width * 0.7, 5)];
-    _lineIV.image =[self getImageName:@"line@2x"];
-    [self.view addSubview:_lineIV];
+    AVAuthorizationStatus authStatus = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];
+    BOOL first = [[NSUserDefaults standardUserDefaults] boolForKey:@"isFirst"];
+    if (authStatus == AVAuthorizationStatusAuthorized) {
+        [self createLine];
+    }else{
+        if (first&&authStatus!=AVAuthorizationStatusDenied) {
+            [self initDevice];
+            [self creatTimer];
+            [self createLine];
+            [[NSUserDefaults standardUserDefaults] setBool:NO forKey:@"isFirst"];
+        }else{
 
-    [self.Session startRunning];
+        }
+
+    }
+        //    if(status == AVAuthorizationStatusAuthorized) {
+
+
+        //    }
+
 }
 - (void)didReceiveMemoryWarning {
     [super didReceiveMemoryWarning];
@@ -56,34 +76,59 @@
     [self.view addSubview:self.backBtn];
     [self.backBtn addTarget:self action:@selector(back) forControlEvents:UIControlEventTouchUpInside];
 }
+- (void)createLine {
+    _lineIV = [[UIImageView alloc] initWithFrame:CGRectMake(([UIScreen mainScreen].bounds.size.width - self.view.layer.bounds.size.width * 0.7)/2,self.view.layer.bounds.size.height * 0.25 , self.view.layer.bounds.size.width * 0.7, 5)];
+    _lineIV.image =[self getImageName:@"line@2x"];
+    [self.view addSubview:_lineIV];
+    [self.Session startRunning];
+}
+        //弹出弹框提示授权信息
+- (void)alertView:(NSString *)msg {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        UIAlertController *alertController = [UIAlertController alertControllerWithTitle:@"提示" message:msg preferredStyle:UIAlertControllerStyleAlert];
+        UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"好的" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+            [self deleteView];
+        }];
+        [alertController addAction:okAction];
+        [self presentViewController:alertController animated:YES completion:nil];
+    });
+}
         //检测相机使用权限
 - (void)checkAVAuthorizationStatus
     {
-  AVAuthorizationStatus status = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];
-  NSString *tips = NSLocalizedString(@"AVAuthorization", @"您没有权限访问相机");
-  if(status == AVAuthorizationStatusAuthorized) {
-          // authorized
-          //        [self initDevice];
-  } else {
-      UIAlertController *alertController = [UIAlertController alertControllerWithTitle:@"提示" message:@"请打开相机设置" preferredStyle:UIAlertControllerStyleAlert];
+  if (self.captureDevice) {
+          // 判断授权状态
+      AVAuthorizationStatus authStatus = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];
+      if (authStatus == AVAuthorizationStatusRestricted) {
+          [self alertView:@"因为系统原因, 无法访问相机"];
+          return;
+      } else if (authStatus == AVAuthorizationStatusDenied) { // 用户拒绝当前应用访问相机
+          [self alertView:@"请在系统设置中打开相机访问权限"];
+          return;
+      } else if (authStatus == AVAuthorizationStatusAuthorized) { // 用户允许当前应用访问相机
+          [self initDevice];
+          [self creatTimer];
 
-      UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil];
-      UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"好的" style:UIAlertActionStyleDefault handler:nil];
-
-      [alertController addAction:cancelAction];
-      [alertController addAction:okAction];
-      [self presentViewController:alertController animated:YES completion:nil];
-
-      NSLog(@"%@",tips);
+      } else if (authStatus == AVAuthorizationStatusNotDetermined) { // 用户还没有做出选择
+          [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"isFirst"];
+              // 弹框请求用户授权
+          [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo completionHandler:^(BOOL granted) {
+              if (granted) {
+                      // 用户接受
+              }else{
+                  dispatch_async(dispatch_get_main_queue(), ^{
+                      [self deleteView];
+                  });
+              }
+          }];
+      }
   }
     }
         //1.初始化摄像机调用准备
 - (void)initDevice {
-        //获取摄像头
-    AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
-    self.captureDevice = device;
+
         //设置输入流（即将摄像头作为图像输入设备，也就是让摄像头作为扫码设备）
-    AVCaptureDeviceInput *input = [AVCaptureDeviceInput deviceInputWithDevice:device error:nil];
+    AVCaptureDeviceInput *input = [AVCaptureDeviceInput deviceInputWithDevice:self.captureDevice error:nil];
         //创建输出流，对输入流捕获的图像，进行解析输出
     AVCaptureMetadataOutput *output = [[AVCaptureMetadataOutput alloc] init];
         //设置输出流代理，通过代理方法读取信息.
